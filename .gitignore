@@ -1,0 +1,4 @@
+data/
+runs/
+.env
+__pycache__/

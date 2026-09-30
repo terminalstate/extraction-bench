@@ -1,0 +1,20 @@
+{
+  "checked": "2026-09-29",
+  "note": "USD per 1M tokens, standard tier. Check the sources and edit before a run if prices changed.",
+  "models": {
+    "gpt-6-luna":       {"provider": "openai",    "input": 0.10, "cached_input": 0.01,  "output": 0.50,
+                         "source": "https://developers.openai.com/api/docs/pricing"},
+    "gpt-6-sol":        {"provider": "openai",    "input": 2.00, "cached_input": 0.20,  "output": 10.00,
+                         "source": "https://developers.openai.com/api/docs/pricing"},
+    "claude-haiku-4-5": {"provider": "anthropic", "input": 1.00, "cached_input": 0.10,  "output": 5.00,
+                         "source": "https://platform.claude.com/docs/en/about-claude/pricing"},
+    "claude-sonnet-5":  {"provider": "anthropic", "input": 2.00, "cached_input": 0.20,  "output": 10.00,
+                         "source": "https://platform.claude.com/docs/en/about-claude/pricing"},
+    "deepseek-flash":   {"provider": "deepseek",  "input": 0.30, "cached_input": 0.006, "output": 1.20,
+                         "offpeak_factor": 0.5,
+                         "source": "https://api-docs.deepseek.com/quick_start/pricing"},
+    "deepseek-v4-pro":  {"provider": "deepseek",  "input": 1.32, "cached_input": 0.044, "output": 3.96,
+                         "offpeak_factor": 0.5,
+                         "source": "https://api-docs.deepseek.com/quick_start/pricing"}
+  }
+}
