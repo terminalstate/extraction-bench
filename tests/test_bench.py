@@ -219,6 +219,50 @@ class NormalisationTests(unittest.TestCase):
         self.assertEqual(s["missing"], 1)
 
 
+class KeyFileTests(unittest.TestCase):
+    def setUp(self):
+        self.saved = {k: os.environ.pop(k, None) for k in bench.KEY_NAMES + ("LLM_KEYS_FILE",)}
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "keys.env"
+
+    def tearDown(self):
+        for k, v in self.saved.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+        self.tmp.cleanup()
+
+    def test_reads_known_names_only_and_the_environment_wins(self):
+        self.path.write_text("# comment\n\nOPENAI_API_KEY=sk-one\nexport ANTHROPIC_API_KEY = 'sk-two'\n"
+                             "DEEPSEEK_API_KEY=\nOTHER_SECRET=x\nnot a line\n")
+        os.chmod(self.path, 0o600)
+        os.environ["ANTHROPIC_API_KEY"] = "from-env"
+        self.assertEqual(bench.load_key_file(self.path), ["OPENAI_API_KEY"])
+        self.assertEqual(os.environ["OPENAI_API_KEY"], "sk-one")
+        self.assertEqual(os.environ["ANTHROPIC_API_KEY"], "from-env")
+        self.assertNotIn("DEEPSEEK_API_KEY", os.environ)
+        self.assertNotIn("OTHER_SECRET", os.environ)
+
+    def test_quotes_env_path_and_missing_file(self):
+        self.path.write_text('ANTHROPIC_API_KEY="sk-two"\n')
+        os.chmod(self.path, 0o600)
+        os.environ["LLM_KEYS_FILE"] = str(self.path)
+        self.assertEqual(bench.load_key_file(), ["ANTHROPIC_API_KEY"])
+        self.assertEqual(os.environ["ANTHROPIC_API_KEY"], "sk-two")
+        self.assertEqual(bench.load_key_file(Path(self.tmp.name) / "none.env"), [])
+
+    def test_warns_when_others_can_read_it(self):
+        import contextlib
+        import io
+        self.path.write_text("OPENAI_API_KEY=sk-one\n")
+        os.chmod(self.path, 0o644)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            bench.load_key_file(self.path)
+        self.assertIn("chmod 600", out.getvalue())
+        self.assertNotIn("sk-one", out.getvalue())
+
+
 class StatsTests(unittest.TestCase):
     def test_bootstrap_interval_and_pairing(self):
         docs = [{"id": f"d{i}", "gold": {("party", "X")}} for i in range(40)]

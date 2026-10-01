@@ -27,6 +27,23 @@ class FakeAPI:
                 if act.get("delay"):
                     time.sleep(act["delay"])
                 raw = act["raw"].encode() if "raw" in act else json.dumps(act.get("body", {})).encode()
+                if act.get("trickle"):
+                    # headers at once, then a newline every `every` seconds for `for` seconds, then the body:
+                    # what a server does to keep a queued request open
+                    self.close_connection = True
+                    try:
+                        self.send_response(act.get("status", 200))
+                        self.send_header("content-type", "application/json")
+                        self.end_headers()
+                        end = time.monotonic() + act["trickle"]["for"]
+                        while time.monotonic() < end:
+                            self.wfile.write(b"\n")
+                            self.wfile.flush()
+                            time.sleep(act["trickle"]["every"])
+                        self.wfile.write(raw)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                    return
                 try:
                     self.send_response(act.get("status", 200))
                     for k, v in (act.get("headers") or {}).items():

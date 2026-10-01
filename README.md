@@ -101,6 +101,21 @@ full rate.
   partly valid answer; give reasoning models room in the output limit, and send slow ones to a queue rather than
   a user's request (p95 of 15 and 47 s for the two DeepSeek models, under 5 s for the rest).
 
+## A second study: the same task on a bad day
+
+[`reliability.md`](reliability.md) asks what happens around the answer: how often a first answer cannot be used,
+why, and what gets it back, with one inexpensive model per provider and every output mechanism its API offers,
+plus two repeats of three of the runs above, one of them with all 83 documents at once. In short:
+
+- Format failures followed each model's habits: one model put every answer in a code fence and kept doing so when
+  told not to; models from two providers wrote `"year"` where the schema allowed only `years`. A local repair
+  made 98 of 99 such answers complete without a request.
+- When the content was wrong, a request that said what was wrong fixed 20 of 20; the same request again, 7.
+- DeepSeek's cut-off answers came from reasoning. Four times the output limit fixed all 11; with thinking off
+  there were none, at less than half the cost and the same F1.
+- All 83 requests at once met no limit at one provider, a concurrency limit that backoff got through at another,
+  and at the third a tokens-per-minute limit that 43 requests did not get past in five attempts.
+
 ## How it works
 
 - **One prompt for every model.** Only the output mechanism differs: strict JSON schema (OpenAI),
@@ -135,6 +150,10 @@ python3 bench.py run --model rules
 python3 bench.py all --ask-keys # asks for the keys without echo (Enter skips a provider);
                                 # each model with a key: 2-document smoke test, then all 83; then report
 ```
+
+Instead of `--ask-keys`, the keys can live in `~/.config/extraction-bench/keys.env`, one `NAME=value` line per
+key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`), readable only by you (`chmod 600`). The second
+study runs the same way: `python3 reliability.py plan`, then `run`, then `report`.
 
 One model at a time: `python3 bench.py run --model claude-haiku-4-5 --limit 5`. Models and prices live in
 `prices.json`; add a model there to include it.

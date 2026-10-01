@@ -10,7 +10,9 @@ Python 3.9+, standard library only. Commands:
   python3 bench.py all                       # every model whose API key is set: 2-doc smoke test, then the split
   python3 bench.py report                    # results.md + errors/<run>.md
 
-API keys are read from OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY.
+API keys are read from OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, or from the file
+~/.config/extraction-bench/keys.env (lines NAME=value; another path in $LLM_KEYS_FILE), or asked for
+with --ask-keys.
 """
 from __future__ import annotations
 
@@ -858,6 +860,38 @@ def cmd_run(args) -> None:
         sys.exit(f"stopped: {e}")
 
 
+KEYS_FILE = "~/.config/extraction-bench/keys.env"   # or the path in $LLM_KEYS_FILE
+KEY_NAMES = ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY")
+
+
+def load_key_file(path=None) -> list:
+    """Reads API keys from a private file, so they need not be typed at every run. Lines are NAME=value
+    (an 'export ' prefix and quotes are allowed); only the three key names above are read, and a key already in
+    the environment wins. Returns the names it set. The default place is outside the project folder, so the
+    file cannot end up in the repository."""
+    path = Path(path or os.environ.get("LLM_KEYS_FILE") or KEYS_FILE).expanduser()
+    if not path.is_file():
+        return []
+    shown = str(path).replace(str(Path.home()), "~", 1)
+    if path.stat().st_mode & 0o077:
+        print(f"warning: other users of this computer can read {shown}; run: chmod 600 {shown}")
+    loaded = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = (x.strip() for x in line.split("=", 1))
+        if name.startswith("export "):
+            name = name[len("export "):].strip()
+        value = value.strip("\"'")
+        if name in KEY_NAMES and value and not os.environ.get(name):
+            os.environ[name] = value
+            loaded.append(name)
+    if loaded:
+        print(f"API keys from {shown}: {', '.join(loaded)}")
+    return loaded
+
+
 def ask_keys() -> None:
     """Prompt for keys without echo, so they stay out of shell history. Enter skips a provider."""
     import getpass
@@ -926,6 +960,8 @@ def main(argv=None) -> None:
     p = sub.add_parser("report"); common(p); p.set_defaults(fn=cmd_report)
     p.add_argument("--resamples", type=int, default=10000, help="bootstrap resamples for the intervals")
     args = ap.parse_args(argv)
+    if args.cmd in ("run", "all") and getattr(args, "model", "") != "rules":
+        load_key_file()
     args.fn(args)
 
 
